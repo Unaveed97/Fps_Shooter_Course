@@ -14,6 +14,7 @@
 #include "BlasterAnimInstance.h"
 #include "FPS_Shooter/FPS_Shooter.h"
 #include "FPS_Shooter/PlayerController/BlasterPlayerController.h"
+#include "FPS_Shooter/GameMode/GM_Fps_Shooter.h"
 
 // Sets default values
 ABlasterCharacter::ABlasterCharacter()
@@ -57,6 +58,12 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 	}*/
 
 	TimeSinceLastMovementReplication = 0.f;
+}
+
+void ABlasterCharacter::Elim()
+{
+	bElimned = true;
+	PlayElimMontage();
 }
 
 void ABlasterCharacter::BeginPlay()
@@ -134,6 +141,15 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 		FName SectionName;
 		SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
 		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+void ABlasterCharacter::PlayElimMontage() {
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr) return;
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ElimMontage) {
+		AnimInstance->Montage_Play(ElimMontage);
 	}
 }
 
@@ -449,6 +465,16 @@ void ABlasterCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const U
 	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
 	UpdateHudHealth();
 	PlayHitReactionMontage();
+
+	
+	if (Health == 0.f) { 
+		AGM_Fps_Shooter* BlasterGameMode = GetWorld()->GetAuthGameMode<AGM_Fps_Shooter>();
+		if (BlasterGameMode) {
+			BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+			ABlasterPlayerController* AttackerController = Cast<ABlasterPlayerController>(InstegatorController);
+			BlasterGameMode->PlayerEliminated(this, BlasterPlayerController, AttackerController);
+		}
+	}
 }
 
 
