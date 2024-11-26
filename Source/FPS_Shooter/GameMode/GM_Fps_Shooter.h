@@ -16,4 +16,5 @@ class FPS_SHOOTER_API AGM_Fps_Shooter : public AGameMode
 	
 public:
 	virtual void PlayerEliminated(class ABlasterCharacter* ElimanatedCharacter, class ABlasterPlayerController* VictimController, class ABlasterPlayerController* AttackerController);
+	virtual void RequestRespawn(class ACharacter* ElimnedCharacter, class AController* ElimnedController);
 };

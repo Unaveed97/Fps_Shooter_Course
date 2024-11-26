@@ -25,6 +25,9 @@ public:
 	virtual void OnRep_ReplicatedMovement() override;
 	void Elim();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastElim();
+
 protected:
 	virtual void BeginPlay() override;
 	void MoveForwad(float Value);
@@ -117,6 +120,12 @@ private:
 
 	bool bElimned = false;
 
+	FTimerHandle ElimTimer;
+
+	UPROPERTY(EditDefaultsOnly)
+	float ElimDelay = 3.f;
+
+	void ElimTimerFinished();
 
 public:	
 	FORCEINLINE void SetOverlappingWeapon(AWeapon* Weapon);

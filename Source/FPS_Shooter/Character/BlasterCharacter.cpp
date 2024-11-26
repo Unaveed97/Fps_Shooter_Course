@@ -15,11 +15,13 @@
 #include "FPS_Shooter/FPS_Shooter.h"
 #include "FPS_Shooter/PlayerController/BlasterPlayerController.h"
 #include "FPS_Shooter/GameMode/GM_Fps_Shooter.h"
+#include "TimerManager.h"
 
 // Sets default values
 ABlasterCharacter::ABlasterCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	//ESpawnActorCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CamerBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
 	CameraBoom->TargetArmLength = 600.f;
@@ -62,8 +64,38 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 
 void ABlasterCharacter::Elim()
 {
+	MulticastElim();
+	GetWorldTimerManager().SetTimer(
+		ElimTimer,
+		this,
+		&ABlasterCharacter::ElimTimerFinished,
+		ElimDelay
+	);
+}
+
+
+void ABlasterCharacter::MulticastElim_Implementation()
+{
 	bElimned = true;
-	PlayElimMontage();
+
+	FTimerDelegate TimerDel;
+
+	TimerDel.BindLambda([this]()
+	{
+		this->PlayElimMontage();
+	});
+
+	GetWorld()->GetTimerManager().SetTimerForNextTick(TimerDel);
+
+//	PlayElimMontage();
+}
+
+void ABlasterCharacter::ElimTimerFinished()
+{
+	AGM_Fps_Shooter* BlasterGameMode = GetWorld()->GetAuthGameMode<AGM_Fps_Shooter>();
+	if (BlasterGameMode) {
+		BlasterGameMode->RequestRespawn(this, Controller);
+	}
 }
 
 void ABlasterCharacter::BeginPlay()
