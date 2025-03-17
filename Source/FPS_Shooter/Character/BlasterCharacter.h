@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "FPS_Shooter/BlasterTypes/TurningInPlace.h"
+#include "Components/TimelineComponent.h"
 #include "FPS_Shooter/Interfaces/InteractWithCrosshairsInterface.h"
 #include "BlasterCharacter.generated.h"
 
@@ -27,6 +28,7 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastElim();
+	virtual void Destroyed() override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -49,6 +51,7 @@ protected:
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType, class AController* InstegatorController, AActor* DamageCauser);
 	void UpdateHudHealth();
+	void PollInit();
 
 private:
 
@@ -125,7 +128,44 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	float ElimDelay = 3.f;
 
+	/*
+	* Dissolve Effect
+	*/
+	UPROPERTY(VisibleAnywhere)
+	UTimelineComponent* DissolveTimeLine;
+	FOnTimelineFloat DissolveTrack;
+	
+	UPROPERTY(EditAnywhere)
+	UCurveFloat* DissolveCurve;
+
+	UFUNCTION()
+	void UpdateDissolveMaterial(float DissolveValue);
+	void StartDissolve();
+
+	// Dynamic Instace that we can change at runtime
+	UPROPERTY(VisibleAnywhere, Category=Elim)
+	UMaterialInstanceDynamic* DynamicDissolveMaterialInstance;
+
+	// Material Instance set on the Blueprint, used with the dynamic material instnace
+	UPROPERTY(EditAnywhere, Category = Elim)
+	UMaterialInstance* DissolveMaterialInstance;
+
 	void ElimTimerFinished();
+
+	/*
+	* ElimBot
+	*/
+	UPROPERTY(EditAnywhere)
+	UParticleSystem* ElimBotEffect;
+
+	UPROPERTY(EditAnywhere)
+	UParticleSystemComponent* ElimBotComponent;
+
+	UPROPERTY(EditAnywhere)
+	class USoundCue* ElimBotSound;
+
+	class ABlasterPlayerState* BlasterPlayerState;
+
 
 public:	
 	FORCEINLINE void SetOverlappingWeapon(AWeapon* Weapon);
@@ -143,4 +183,6 @@ public:
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
 	FORCEINLINE bool IsElimned() const { return bElimned; }
+	FORCEINLINE float GetHealth() const { return Health; }
+	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 };

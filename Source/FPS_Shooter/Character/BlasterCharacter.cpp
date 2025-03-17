@@ -16,6 +16,10 @@
 #include "FPS_Shooter/PlayerController/BlasterPlayerController.h"
 #include "FPS_Shooter/GameMode/GM_Fps_Shooter.h"
 #include "TimerManager.h"
+#include "Kismet/GamePlayStatics.h"
+#include "Sound/SoundCue.h"
+#include "Particles/ParticleSystemComponent.h"
+#include"FPS_Shooter/PlayerState/BlasterPlayerState.h"
 
 // Sets default values
 ABlasterCharacter::ABlasterCharacter()
@@ -47,6 +51,8 @@ ABlasterCharacter::ABlasterCharacter()
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	NetUpdateFrequency = 66.f;
 	MinNetUpdateFrequency = 33.f;
+
+	DissolveTimeLine = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimeLineComponent"));
 }
 
 void ABlasterCharacter::OnRep_ReplicatedMovement()
@@ -64,6 +70,9 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 
 void ABlasterCharacter::Elim()
 {
+	if (Combat && Combat->EquippedWeapon) {
+		Combat->EquippedWeapon->Dropped();
+	}
 	MulticastElim();
 	GetWorldTimerManager().SetTimer(
 		ElimTimer,
@@ -85,9 +94,64 @@ void ABlasterCharacter::MulticastElim_Implementation()
 		this->PlayElimMontage();
 	});
 
+	// Start Dissolve Effect
+	if (DissolveMaterialInstance) {
+		DynamicDissolveMaterialInstance = UMaterialInstanceDynamic::Create(DissolveMaterialInstance, this);
+		GetMesh()->SetMaterial(0, DynamicDissolveMaterialInstance);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), 0.55f);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Glow"), 200.0f);
+	}
+
+	// Disable Character Movement
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+	if (BlasterPlayerController) {
+		DisableInput(BlasterPlayerController);
+	}
+
+	//Disable Collision
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision); 
+	
+	StartDissolve();
+
 	GetWorld()->GetTimerManager().SetTimerForNextTick(TimerDel);
 
+	//SpawnElimBot
+	if (ElimBotEffect) {
+		FVector ElimBotSpawnPoint(GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z + 200.f);
+		ElimBotComponent = UGameplayStatics::SpawnEmitterAtLocation(
+			GetWorld(),
+			ElimBotEffect,
+			ElimBotSpawnPoint,
+			GetActorRotation()
+		);
+	}
+	if (ElimBotSound) {
+		UGameplayStatics::SpawnSoundAtLocation(
+			this,
+			ElimBotSound,
+			GetActorLocation()
+		);
+	}
+
 //	PlayElimMontage();
+}
+
+void ABlasterCharacter::UpdateDissolveMaterial(float DissolveValue)
+{
+	if (DynamicDissolveMaterialInstance) {
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), DissolveValue);
+	}
+}
+
+void ABlasterCharacter::StartDissolve()
+{
+	DissolveTrack.BindDynamic(this, &ABlasterCharacter::UpdateDissolveMaterial);
+	if (DissolveCurve && DissolveTimeLine) {
+		DissolveTimeLine->AddInterpFloat(DissolveCurve, DissolveTrack);
+		DissolveTimeLine->Play();
+	}
 }
 
 void ABlasterCharacter::ElimTimerFinished()
@@ -95,6 +159,15 @@ void ABlasterCharacter::ElimTimerFinished()
 	AGM_Fps_Shooter* BlasterGameMode = GetWorld()->GetAuthGameMode<AGM_Fps_Shooter>();
 	if (BlasterGameMode) {
 		BlasterGameMode->RequestRespawn(this, Controller);
+	}
+}
+
+void ABlasterCharacter::Destroyed()
+{
+	Super::Destroyed();
+
+	if (ElimBotComponent) {
+		ElimBotComponent->DestroyComponent();
 	}
 }
 
@@ -115,6 +188,17 @@ void ABlasterCharacter::UpdateHudHealth()
 	BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
 	if (BlasterPlayerController) {
 		BlasterPlayerController->SetHUDHealth(Health, MaxHealth);
+	}
+}
+
+void ABlasterCharacter::PollInit()
+{
+	if (BlasterPlayerState == nullptr) {
+	 	BlasterPlayerState = GetPlayerState<ABlasterPlayerState>();
+		if (BlasterPlayerState) {
+			BlasterPlayerState->AddToScore(0.f);
+			BlasterPlayerState->AddToDefeats(0);
+		}
 	}
 }
 
@@ -324,7 +408,7 @@ void ABlasterCharacter::SimProxiesTurn()
 	ProxyRotation = GetActorRotation();
 	ProxyYaw = UKismetMathLibrary::NormalizedDeltaRotator(ProxyRotation, ProxyRotationLastFrame).Yaw;
 	
-	UE_LOG(LogTemp, Warning, TEXT("ProxyYaw: %f"), ProxyYaw);
+	//UE_LOG(LogTemp, Warning, TEXT("ProxyYaw: %f"), ProxyYaw);
 
 	if (FMath::Abs(ProxyYaw) > TurnThreshold) {
 		if (ProxyYaw > TurnThreshold) {
@@ -392,6 +476,8 @@ void ABlasterCharacter::Tick(float DeltaTime)
 		CalculateAO_Pitch();
 	}
 	HideCameraIfCharacterClose();
+	PollInit();
+
 }
 
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
