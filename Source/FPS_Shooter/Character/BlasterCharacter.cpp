@@ -85,6 +85,11 @@ void ABlasterCharacter::Elim()
 
 void ABlasterCharacter::MulticastElim_Implementation()
 {
+
+	if (BlasterPlayerController) {
+		BlasterPlayerController->SetHUDWeaponAmmo(0);
+	}
+
 	bElimned = true;
 
 	FTimerDelegate TimerDel;
@@ -176,6 +181,11 @@ void ABlasterCharacter::BeginPlay()
 	Super::BeginPlay();
 
 	UpdateHudHealth();
+
+	BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+	if (BlasterPlayerController) {
+		BlasterPlayerController->HideDeathMessage();
+	}
 
 	if (HasAuthority()) {
 		OnTakeAnyDamage.AddDynamic(this, &ABlasterCharacter::ReceiveDamage);

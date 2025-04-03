@@ -48,9 +48,11 @@ protected:
 
 
 private:
-
+	UPROPERTY()
 	class ABlasterCharacter* Character;
+	UPROPERTY()
 	class ABlasterPlayerController* Controller;
+	UPROPERTY()
 	class ABlasterHUD* HUD;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
@@ -101,6 +103,8 @@ private:
 
 	void StartFireTimer();
 	void FireTimerFinished();
+
+	bool CanFire();
 
 public:	
 
